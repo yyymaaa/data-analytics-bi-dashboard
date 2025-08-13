@@ -22,6 +22,8 @@ const processedMetricRoutes = require('./routes/ProcessedMetric');
 app.use('/api/processedmetric', processedMetricRoutes);
 const rawDataRoutes = require('./routes/RawData');
 app.use('/api/rawdata', rawDataRoutes);
+const dashboardConfigRoutes = require('./routes/DashboardConfig');
+app.use('/api/dashboardconfig', dashboardConfigRoutes);
 
 // Connect to MongoDB
 mongoose.connect(process.env.MONGO_URI)
