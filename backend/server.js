@@ -14,6 +14,9 @@ const authRoutes = require('./routes/auth');
 app.use('/api/auth', authRoutes);
 const dashboardRoutes = require('./routes/dashboard');
 app.use('/api/dashboard', dashboardRoutes);
+const userRoutes = require('./routes/User');
+app.use('/api/user', userRoutes);
+
 
 
 // Connect to MongoDB
