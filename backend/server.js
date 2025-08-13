@@ -10,9 +10,8 @@ app.use(cors());
 app.use(express.json());
 
 //routes
-require('dotenv').config();
-app.use('/api/auth', require('./routes/auth'));
-
+const authRoutes = require('./routes/auth');
+app.use('/api/auth', authRoutes);
 
 // Connect to MongoDB
 mongoose.connect(process.env.MONGO_URI)
