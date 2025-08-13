@@ -18,6 +18,8 @@ const userRoutes = require('./routes/User');
 app.use('/api/user', userRoutes);
 const dataSourceRoutes = require('./routes/DataSource');
 app.use('/api/datasource', dataSourceRoutes);
+const processedMetricRoutes = require('./routes/ProcessedMetric');
+app.use('/api/processedmetric', processedMetricRoutes);
 
 // Connect to MongoDB
 mongoose.connect(process.env.MONGO_URI)
