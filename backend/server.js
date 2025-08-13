@@ -16,8 +16,8 @@ const dashboardRoutes = require('./routes/dashboard');
 app.use('/api/dashboard', dashboardRoutes);
 const userRoutes = require('./routes/User');
 app.use('/api/user', userRoutes);
-
-
+const dataSourceRoutes = require('./routes/DataSource');
+app.use('/api/datasource', dataSourceRoutes);
 
 // Connect to MongoDB
 mongoose.connect(process.env.MONGO_URI)
