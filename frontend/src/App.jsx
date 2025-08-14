@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, useNavigate } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route, Link, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import axios from "axios";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -82,10 +82,22 @@ function Unauthorized() {
   return <h2>You are not authorized to view this page</h2>;
 }
 
+// Navigation Bar
+function NavBar() {
+  return (
+    <nav style={{ marginBottom: '20px' }}>
+      <Link to="/" style={{ marginRight: '10px' }}>Home</Link>
+      <Link to="/login" style={{ marginRight: '10px' }}>Login</Link>
+      <Link to="/dashboard">Dashboard</Link>
+    </nav>
+  );
+}
+
 // App Component
 export default function App() {
   return (
     <Router>
+      <NavBar />
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/login" element={<LoginPage />} />
