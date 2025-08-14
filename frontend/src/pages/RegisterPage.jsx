@@ -11,12 +11,28 @@ export default function RegisterPage() {
   const [error, setError] = useState("");
   const navigate = useNavigate();
 
+  // Password validation criteria
+  const passwordCriteria = {
+    length: password.length >= 8,
+    uppercase: /[A-Z]/.test(password),
+    lowercase: /[a-z]/.test(password),
+    number: /[0-9]/.test(password),
+    special: /[!@#$%^&*(),.?":{}|<>]/.test(password),
+  };
+
+  const isPasswordValid = Object.values(passwordCriteria).every(Boolean);
+
   const handleRegister = async (e) => {
     e.preventDefault();
     setError("");
 
     if (password !== confirmPassword) {
       setError("Passwords do not match");
+      return;
+    }
+
+    if (!isPasswordValid) {
+      setError("Password does not meet all criteria");
       return;
     }
 
@@ -68,6 +84,26 @@ export default function RegisterPage() {
             required
             style={styles.input}
           />
+
+          {/* Password criteria */}
+          <ul style={styles.criteriaList}>
+            <li style={passwordCriteria.length ? styles.valid : styles.invalid}>
+              At least 8 characters
+            </li>
+            <li style={passwordCriteria.uppercase ? styles.valid : styles.invalid}>
+              At least one uppercase letter
+            </li>
+            <li style={passwordCriteria.lowercase ? styles.valid : styles.invalid}>
+              At least one lowercase letter
+            </li>
+            <li style={passwordCriteria.number ? styles.valid : styles.invalid}>
+              At least one number
+            </li>
+            <li style={passwordCriteria.special ? styles.valid : styles.invalid}>
+              At least one special character
+            </li>
+          </ul>
+
           <input
             type="password"
             placeholder="Confirm Password"
@@ -178,5 +214,18 @@ const styles = {
   link: {
     color: "#00ff80",
     textDecoration: "underline",
+  },
+  criteriaList: {
+    listStyleType: "none",
+    textAlign: "left",
+    margin: "5px 0 10px 0",
+    padding: 0,
+    fontSize: "12px",
+  },
+  valid: {
+    color: "#00ff80",
+  },
+  invalid: {
+    color: "#ff4d4d",
   },
 };
