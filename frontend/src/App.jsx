@@ -2,53 +2,10 @@ import { BrowserRouter as Router, Routes, Route, Link, useNavigate } from "react
 import { useEffect, useState } from "react";
 import axios from "axios";
 import ProtectedRoute from "./components/ProtectedRoute";
+// Import pages
+import Login from "./pages/Login";
 import RegisterPage from "./pages/RegisterPage";
 import VerifyPage from "./pages/VerifyPage";
-
-// Login Page
-function LoginPage() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const navigate = useNavigate();
-
-  const handleLogin = async (e) => {
-    e.preventDefault();
-    setError('');
-
-    try {
-      const res = await axios.post('http://localhost:5000/api/auth/login', { email, password });
-      localStorage.setItem('token', res.data.token);
-      navigate('/dashboard');
-    } catch (err) {
-      setError(err.response?.data?.error || 'Login failed');
-    }
-  };
-
-  return (
-    <div>
-      <h2>Login</h2>
-      {error && <p style={{ color: 'red' }}>{error}</p>}
-      <form onSubmit={handleLogin}>
-        <input 
-          type="email"
-          placeholder="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-        /><br />
-        <input
-          type="password"
-          placeholder="Password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-        /><br />
-        <button type="submit">Login</button>
-      </form>
-    </div>
-  );
-}
 
 // Dashboard Page
 function DashboardPage() {
@@ -90,6 +47,7 @@ function NavBar() {
     <nav style={{ marginBottom: '20px' }}>
       <Link to="/" style={{ marginRight: '10px' }}>Home</Link>
       <Link to="/login" style={{ marginRight: '10px' }}>Login</Link>
+      <Link to="/register" style={{ marginRight: '10px' }}>Register</Link>
       <Link to="/dashboard">Dashboard</Link>
     </nav>
   );
@@ -102,7 +60,7 @@ export default function App() {
       <NavBar />
       <Routes>
         <Route path="/" element={<HomePage />} />
-        <Route path="/login" element={<LoginPage />} />
+        <Route path="/login" element={<Login />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/verify" element={<VerifyPage />} />
         <Route

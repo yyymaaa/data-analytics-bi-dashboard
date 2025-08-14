@@ -42,9 +42,10 @@ export default function Login() {
             onChange={(e) => setPassword(e.target.value)}
             required
           />
-        </div>
+        </div>    
         <br />
         <button type="submit">Login</button>
+        <p>Don't have an account? <a href="/register">Register here</a></p>
       </form>
     </div>
   );
