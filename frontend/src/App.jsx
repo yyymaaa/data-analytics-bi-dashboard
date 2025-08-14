@@ -2,6 +2,8 @@ import { BrowserRouter as Router, Routes, Route, Link, useNavigate } from "react
 import { useEffect, useState } from "react";
 import axios from "axios";
 import ProtectedRoute from "./components/ProtectedRoute";
+import RegisterPage from "./pages/RegisterPage";
+import VerifyPage from "./pages/VerifyPage";
 
 // Login Page
 function LoginPage() {
@@ -101,6 +103,8 @@ export default function App() {
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
+        <Route path="/verify" element={<VerifyPage />} />
         <Route
           path="/dashboard"
           element={
