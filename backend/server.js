@@ -4,6 +4,13 @@ const cors = require('cors');
 const mongoose = require('mongoose');
 require('dotenv').config();
 
+const mutler = require('mutler');
+const csvParser = require('csv-pasrser');
+const fs = require('fs');
+const path = require('path');
+const RawData = require('/models/RawData');
+const authMiddleware = require('./middleware/authMiddleware');
+
 const app = express();
 
 // Middleware - MUST come after app is defined!
@@ -51,6 +58,35 @@ app.use('/api/rawdata', rawDataRoutes);
 
 const dashboardConfigRoutes = require('./routes/DashboardConfig');
 app.use('/api/dashboardconfig', dashboardConfigRoutes);
+
+
+const upload = multer({ dest: 'uploads/' });
+
+app.post('/app/upload-csv', authMiddleware, upload.single('file'), (req, res) => {
+  const results = [];
+  const filePath = req.file.path;
+
+  fs.createReadStream(filePath)
+  .pipe(csvParser())
+  .on('data', (data) => results.push(data))
+  .on('end', async () => {
+    try {
+      await RawData.insertMany(
+        results,map(row =>({
+          user: req.user.id,
+          data: row
+        }))
+      );
+
+      fs.unlinkSync(filePath);
+
+      res.json({message: 'CSV uploaded and processed', count: results.length  });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Error processing CSV' });
+    }
+  });
+});
 
 // Connect to MongoDB 
 mongoose.connect(process.env.MONGO_URI)
