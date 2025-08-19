@@ -1,6 +1,8 @@
+//frontend/src/pages/RegisterPage.jsx
 import { useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
+
 
 export default function RegisterPage() {
   const [name, setName] = useState("");
@@ -9,9 +11,11 @@ export default function RegisterPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [role, setRole] = useState("viewer");
   const [error, setError] = useState("");
+  const [emailError, setEmailError] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
 
-  // Password validation criteria
+  // Password validation
   const passwordCriteria = {
     length: password.length >= 8,
     uppercase: /[A-Z]/.test(password),
@@ -19,35 +23,49 @@ export default function RegisterPage() {
     number: /[0-9]/.test(password),
     special: /[!@#$%^&*(),.?":{}|<>]/.test(password),
   };
-
   const isPasswordValid = Object.values(passwordCriteria).every(Boolean);
 
   const handleRegister = async (e) => {
     e.preventDefault();
     setError("");
+    setEmailError("");
+    setIsLoading(true);
 
+    // Validation
     if (password !== confirmPassword) {
-      setError("Passwords do not match");
+      setError("Passwords don't match");
+      setIsLoading(false);
       return;
     }
-
     if (!isPasswordValid) {
-      setError("Password does not meet all criteria");
+      setError("Password doesn't meet requirements");
+      setIsLoading(false);
       return;
     }
 
     try {
-      await axios.post("http://localhost:5000/api/auth/register", {
-        name,
-        email,
-        password,
-        role,
-      });
+      const res = await axios.post(
+        "http://localhost:5000/api/auth/register",
+        { name, email, password, role },
+        { withCredentials: true }
+      );
 
-      // Redirect to mock verification page for now
-      navigate("/verify");
+      if (res.status === 201) {
+        localStorage.setItem("email", email);
+        navigate("/verify");
+      }
     } catch (err) {
-      setError(err.response?.data?.error || "Registration failed");
+      const errorMsg = err.response?.data?.error || "Registration failed";
+      setError(errorMsg);
+      
+      // Special case: Email failed but user was created
+      if (errorMsg.includes("verification")) {
+        setEmailError("Account created! Check email or resend code.");
+        localStorage.setItem("email", email);
+        navigate("/verify");
+      }
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -58,6 +76,7 @@ export default function RegisterPage() {
         <p style={styles.subtitle}>Join our analytics platform</p>
 
         {error && <p style={styles.error}>{error}</p>}
+        {emailError && <p style={styles.warning}>{emailError}</p>}
 
         <form onSubmit={handleRegister} style={styles.form}>
           <input
@@ -168,6 +187,11 @@ const styles = {
   },
   error: {
     color: "#ff4d4d",
+    marginBottom: "15px",
+    fontWeight: "500",
+  },
+  warning: {
+    color: "#FFA500", // Orange for warnings
     marginBottom: "15px",
     fontWeight: "500",
   },

@@ -1,4 +1,3 @@
-//backend.models.User.js
 const mongoose = require('mongoose');
 
 const userSchema = new mongoose.Schema({
@@ -22,6 +21,14 @@ const userSchema = new mongoose.Schema({
     type: String,
     enum: ['admin', 'analyst', 'viewer'],
     default: 'analyst'
+  },
+  verificationCode: {
+    type: String,
+    default: null
+  },
+  isVerified: {
+    type: Boolean,
+    default: false
   }
 }, { timestamps: true });
 
