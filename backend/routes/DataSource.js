@@ -5,8 +5,10 @@ const csv = require('csv-parser');
 const fs = require('fs');
 const DataSource = require('../models/DataSource');
 const authMiddleware = require('../middleware/authMiddleware');
+const multer = require('multer');
+const RawData = require('../models/RawData');
 
-const upload = mutler({dest: 'uploads/'}); //files will temporarily go into /uploads folder
+const upload = multer({dest: 'uploads/'}); //files will temporarily go into /uploads folder
 
 
 // GET all data sources for the logged-in user
@@ -93,7 +95,7 @@ router.delete('/:id', authMiddleware, async (req, res) => {
 //CSV upload route
 router.post('/:id/upload', authMiddleware, upload.single('file'), async (req, res) => {
   try {
-    const source = await DataSource.findByaId(req.params.id);
+    const source = await DataSource.findById(req.params.id);
     if (!source) return res.status(404).json({error: 'DataSource not found'});
     if (source.user.toString() !== req.user.id) {
       return res.status(403).json({error: 'Forbidden'});
@@ -105,13 +107,13 @@ router.post('/:id/upload', authMiddleware, upload.single('file'), async (req, re
     fs.createReadStream(req.file.path)
     .pipe(csv())
     .on('data', (row) => {
-      SpeechRecognitionResultList.push({
-        dataSource: source._id,
+      results.push({
+        source: source._id,
         user: req.user.id,
-        raw: row
+        data: row
       });
     })
-    .on('end', async () =>{
+    .on('end', async () => {
       //save the rows into RawData
       await RawData.insertMany(results);
 
@@ -120,6 +122,7 @@ router.post('/:id/upload', authMiddleware, upload.single('file'), async (req, re
       res.json({ message: 'CSV uploaded and saved', rows: results.length});
     });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: 'Server error' });
   }
 });

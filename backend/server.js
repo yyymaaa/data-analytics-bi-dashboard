@@ -4,11 +4,11 @@ const cors = require('cors');
 const mongoose = require('mongoose');
 require('dotenv').config();
 
-const mutler = require('mutler');
-const csvParser = require('csv-pasrser');
+const multer = require('multer');
+const csvParser = require('csv-parser');
 const fs = require('fs');
 const path = require('path');
-const RawData = require('/models/RawData');
+const RawData = require('./models/RawData');
 const authMiddleware = require('./middleware/authMiddleware');
 
 const app = express();
@@ -62,7 +62,7 @@ app.use('/api/dashboardconfig', dashboardConfigRoutes);
 
 const upload = multer({ dest: 'uploads/' });
 
-app.post('/app/upload-csv', authMiddleware, upload.single('file'), (req, res) => {
+app.post('/api/upload-csv', authMiddleware, upload.single('file'), (req, res) => {
   const results = [];
   const filePath = req.file.path;
 
@@ -72,8 +72,9 @@ app.post('/app/upload-csv', authMiddleware, upload.single('file'), (req, res) =>
   .on('end', async () => {
     try {
       await RawData.insertMany(
-        results,map(row =>({
+        results.map(row =>({
           user: req.user.id,
+          source: 'csv-upload',
           data: row
         }))
       );

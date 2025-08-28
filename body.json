@@ -1,0 +1,5 @@
+{
+    "type": "csv-upload",
+    "name": "My CSV Upload",
+    "config": {}
+}
