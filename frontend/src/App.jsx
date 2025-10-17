@@ -8,6 +8,7 @@ import VerifyPage from "./pages/VerifyPage";
 import DashboardLayout from "./components/DashboardLayout";
 import DataSourcePage from "./pages/DataSourcePage";
 import DataViewPage from "./pages/DataViewPage";
+import SettingsPage from "./pages/SettingsPage";
 import axios from "axios";
 
 
@@ -108,6 +109,18 @@ export default function App() {
     </ProtectedRoute>
   }
 />
+
+<Route
+  path="/settings"
+  element={
+    <ProtectedRoute allowedRoles={["admin", "analyst", "viewer"]}>
+      <DashboardLayout>
+        <SettingsPage />
+      </DashboardLayout>
+    </ProtectedRoute>
+  }
+/>
+
           <Route path="/unauthorized" element={<Unauthorized />} />
         </Routes>
       </Router>
