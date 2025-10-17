@@ -7,7 +7,9 @@ import RegisterPage from "./pages/RegisterPage";
 import VerifyPage from "./pages/VerifyPage";
 import DashboardLayout from "./components/DashboardLayout";
 import DataSourcePage from "./pages/DataSourcePage";
+import DataViewPage from "./pages/DataViewPage";
 import axios from "axios";
+
 
 //Dashboard Page 
 function DashboardPage() {
@@ -96,6 +98,16 @@ export default function App() {
             }
           />
 
+<Route
+  path="/data-view"
+  element={
+    <ProtectedRoute allowedRoles={["admin", "analyst"]}>
+      <DashboardLayout>
+        <DataViewPage />
+      </DashboardLayout>
+    </ProtectedRoute>
+  }
+/>
           <Route path="/unauthorized" element={<Unauthorized />} />
         </Routes>
       </Router>
