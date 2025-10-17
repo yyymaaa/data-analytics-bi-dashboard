@@ -1,3 +1,4 @@
+//frontend/src/pages/VerifyPage.jsx
 import { useState, useEffect, useRef } from "react";
 import api from "../services/api";
 import { useNavigate } from "react-router-dom";

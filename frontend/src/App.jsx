@@ -1,23 +1,27 @@
-import { BrowserRouter as Router, Routes, Route, Link, useNavigate } from "react-router-dom";
+// frontend/src/App.jsx
+import { BrowserRouter as Router, Routes, Route, Link } from "react-router-dom";
 import { useEffect, useState } from "react";
-import axios from "axios";
 import ProtectedRoute from "./components/ProtectedRoute";
-// Import pages
 import Login from "./pages/Login";
 import RegisterPage from "./pages/RegisterPage";
 import VerifyPage from "./pages/VerifyPage";
+import DashboardLayout from "./components/DashboardLayout";
+import DataSourcePage from "./pages/DataSourcePage";
+import axios from "axios";
 
-// Dashboard Page
+//Dashboard Page 
 function DashboardPage() {
   return (
-    <div style={styles.pageContent}>
-      <h2 style={styles.title}>Welcome to the Dashboard</h2>
-      <p style={styles.subtitle}>You are now logged in.</p>
-    </div>
+    <DashboardLayout>
+      <div style={styles.pageContent}>
+        <h2 style={styles.title}>Welcome to the Dashboard</h2>
+        <p style={styles.subtitle}>You are now logged in.</p>
+      </div>
+    </DashboardLayout>
   );
 }
 
-// Home Page
+//  Home Page
 function HomePage() {
   const [message, setMessage] = useState("");
 
@@ -38,7 +42,7 @@ function HomePage() {
   );
 }
 
-// Unauthorized Page
+//  Unauthorized Page 
 function Unauthorized() {
   return (
     <div style={styles.pageContent}>
@@ -47,7 +51,7 @@ function Unauthorized() {
   );
 }
 
-// Navigation Bar
+// Navigation Bar 
 function NavBar() {
   return (
     <nav style={styles.navBar}>
@@ -55,11 +59,12 @@ function NavBar() {
       <Link to="/login" style={styles.navLink}>Login</Link>
       <Link to="/register" style={styles.navLink}>Register</Link>
       <Link to="/dashboard" style={styles.navLink}>Dashboard</Link>
+      <Link to="/datasources" style={styles.navLink}>Data Sources</Link>
     </nav>
   );
 }
 
-// App Component
+//  App Component 
 export default function App() {
   return (
     <div style={styles.appContainer}>
@@ -70,6 +75,7 @@ export default function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/verify" element={<VerifyPage />} />
+
           <Route
             path="/dashboard"
             element={
@@ -78,6 +84,18 @@ export default function App() {
               </ProtectedRoute>
             }
           />
+
+          <Route
+            path="/datasources"
+            element={
+              <ProtectedRoute allowedRoles={["admin", "analyst"]}>
+                <DashboardLayout>
+                  <DataSourcePage />
+                </DashboardLayout>
+              </ProtectedRoute>
+            }
+          />
+
           <Route path="/unauthorized" element={<Unauthorized />} />
         </Routes>
       </Router>
@@ -94,26 +112,26 @@ const styles = {
     fontFamily: "'Fira Code', monospace, 'Courier New'",
     margin: 0,
     padding: 0,
-    width: "100vw", // Ensures full viewport width
-    overflowX: "hidden", // Prevents horizontal scroll
+    width: "100vw",
+    overflowX: "hidden",
   },
   pageContent: {
     padding: "20px",
     textAlign: "center",
-    width: "100%", // Takes full width
-    boxSizing: "border-box", // Includes padding in width calculation
+    width: "100%",
+    boxSizing: "border-box",
   },
   title: {
     fontSize: "2rem",
     fontWeight: "600",
     textShadow: "0 0 10px #00ff80",
     marginBottom: "1rem",
-    width: "100%", // Ensures full width
+    width: "100%",
   },
   subtitle: {
     fontSize: "1.2rem",
     color: "#00ff80",
-    width: "100%", // Ensures full width
+    width: "100%",
   },
   neonAnimated: {
     color: "#00ff80",
@@ -128,8 +146,8 @@ const styles = {
     justifyContent: "center",
     gap: "20px",
     boxShadow: "0 2px 10px rgba(0,0,0,0.5)",
-    width: "100%", // Takes full width
-    boxSizing: "border-box", // Includes padding in width calculation
+    width: "100%",
+    boxSizing: "border-box",
   },
   navLink: {
     color: "#00ff80",
@@ -146,6 +164,3 @@ const styles = {
     "100%": { opacity: 0.8, textShadow: "0 0 5px #00ff80" },
   },
 };
-
-// Add this to your main CSS file or index.html
-// body { margin: 0; padding: 0; font-family: 'Fira Code', monospace; }

@@ -2,18 +2,20 @@
 const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
-require('dotenv').config();
-
-const multer = require('multer');
-const csvParser = require('csv-parser');
 const fs = require('fs');
 const path = require('path');
-const RawData = require('./models/RawData');
-const authMiddleware = require('./middleware/authMiddleware');
+require('dotenv').config();
 
 const app = express();
 
-// Middleware - MUST come after app is defined!
+// Ensure uploads folder exists for Multer
+const uploadDir = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+  console.log('Created uploads folder at', uploadDir);
+}
+
+// Middleware
 app.use(cors({
   origin: 'http://localhost:5173',
   credentials: true,
@@ -32,7 +34,6 @@ app.use((req, res, next) => {
   console.log('=========================');
   next();
 });
-
 
 // Routes 
 const authRoutes = require('./routes/auth');
@@ -58,36 +59,6 @@ app.use('/api/rawdata', rawDataRoutes);
 
 const dashboardConfigRoutes = require('./routes/DashboardConfig');
 app.use('/api/dashboardconfig', dashboardConfigRoutes);
-
-
-const upload = multer({ dest: 'uploads/' });
-
-app.post('/api/upload-csv', authMiddleware, upload.single('file'), (req, res) => {
-  const results = [];
-  const filePath = req.file.path;
-
-  fs.createReadStream(filePath)
-  .pipe(csvParser())
-  .on('data', (data) => results.push(data))
-  .on('end', async () => {
-    try {
-      await RawData.insertMany(
-        results.map(row =>({
-          user: req.user.id,
-          source: 'csv-upload',
-          data: row
-        }))
-      );
-
-      fs.unlinkSync(filePath);
-
-      res.json({message: 'CSV uploaded and processed', count: results.length  });
-    } catch (err) {
-      console.error(err);
-      res.status(500).json({ error: 'Error processing CSV' });
-    }
-  });
-});
 
 // Connect to MongoDB 
 mongoose.connect(process.env.MONGO_URI)
