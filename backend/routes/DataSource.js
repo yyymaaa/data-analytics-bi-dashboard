@@ -10,6 +10,16 @@ const RawData = require('../models/RawData');
 const DataSource = require('../models/DataSource');
 const authMiddleware = require('../middleware/authMiddleware');
 
+const { BetaAnalyticsDataClient } = require('@google-analytics/data');
+
+const analyticsDataClient = new BetaAnalyticsDataClient({
+  credentials: {
+    client_email: process.env.GA_CLIENT_EMAIL,
+    private_key: process.env.GA_PRIVATE_KEY,
+  },
+});
+
+
 const upload = multer({ dest: 'uploads/' });
 
 // Helper: save rows to RawData
@@ -138,16 +148,22 @@ router.post('/upload/excel', authMiddleware, upload.single('file'), async (req, 
 
 // === GOOGLE ANALYTICS (SIMULATED) ===
 router.post('/google-analytics', authMiddleware, async (req, res) => {
-  try {
-    const { name, config } = req.body;
-    if (!name) return res.status(400).json({ message: 'Name required' });
+  const { name, config } = req.body;
+  const propertyId = config.propertyId;
 
-    // Simulated data
-    const analyticsData = [
-      { date: '2025-10-01', pageViews: 1240, users: 300 },
-      { date: '2025-10-02', pageViews: 980, users: 260 },
-      { date: '2025-10-03', pageViews: 1500, users: 400 },
-    ];
+  try {
+    const [response] = await analyticsDataClient.runReport({
+      property: `properties/${propertyId}`,
+      dateRanges: [{ startDate: '2025-10-01', endDate: 'today' }],
+      metrics: [{ name: 'activeUsers' }, { name: 'screenPageViews' }],
+      dimensions: [{ name: 'date' }],
+    });
+
+    const analyticsData = response.rows.map(row => ({
+      date: row.dimensionValues[0].value,
+      users: parseInt(row.metricValues[0].value, 10),
+      pageViews: parseInt(row.metricValues[1].value, 10),
+    }));
 
     const dataSource = await DataSource.create({
       user: req.user._id,
@@ -155,20 +171,21 @@ router.post('/google-analytics', authMiddleware, async (req, res) => {
       name: name,
       config: config,
       metadata: {
-        headers: analyticsData.length > 0 ? Object.keys(analyticsData[0]) : [],
+        headers: Object.keys(analyticsData[0]),
         rowCount: analyticsData.length
       }
     });
 
     await saveRowsToRawData(analyticsData, dataSource._id);
 
-    res.json({ 
-      message: 'Google Analytics data connected successfully', 
-      dataSource 
+    res.json({
+      message: 'Google Analytics data imported successfully',
+      dataSource,
+      rowsImported: analyticsData.length
     });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Error connecting Google Analytics', error: error.message });
+    console.error('Error fetching GA data:', error);
+    res.status(500).json({ message: 'Error fetching GA data', error: error.message });
   }
 });
 
