@@ -1,180 +1,216 @@
 // backend/routes/DataSource.js
-const express = require("express");
+const express = require('express');
 const router = express.Router();
-const csv = require("csv-parser");
-const fs = require("fs");
-const xlsx = require("xlsx");
-const multer = require("multer");
-const DataSource = require("../models/DataSource");
-const RawData = require("../models/RawData");
-const authMiddleware = require("../middleware/authMiddleware");
+const multer = require('multer');
+const csv = require('csv-parser');
+const XLSX = require('xlsx');
+const fs = require('fs');
+const path = require('path');
+const RawData = require('../models/RawData');
+const DataSource = require('../models/DataSource');
+const authMiddleware = require('../middleware/authMiddleware');
 
-// Multer storage
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, "uploads/"),
-  filename: (req, file, cb) => cb(null, `${Date.now()}-${file.originalname}`),
-});
-const upload = multer({ storage });
+const upload = multer({ dest: 'uploads/' });
 
-/* -------------------------------
-   GET all data sources (optional search)
--------------------------------- */
-router.get("/", authMiddleware, async (req, res) => {
+// Helper: save rows to RawData
+async function saveRowsToRawData(rows, sourceId) {
+  if (!Array.isArray(rows) || rows.length === 0) return;
+  
+  const formatted = rows.map(row => ({ 
+    source: sourceId,
+    data: row 
+  }));
+  
+  await RawData.insertMany(formatted);
+}
+
+// === GET ALL DATA SOURCES FOR USER ===
+router.get('/', authMiddleware, async (req, res) => {
   try {
-    const userId = req.user.id;
-    const search = req.query.search || "";
-
-    const sources = await DataSource.find({
-      user: userId,
-      name: { $regex: search, $options: "i" } // case-insensitive search
-    }).sort({ createdAt: -1 });
-
-    res.json({ sources });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Server error" });
-  }
-});
-
-/* -------------------------------
-   GET single data source by ID
--------------------------------- */
-router.get("/:id", authMiddleware, async (req, res) => {
-  try {
-    const source = await DataSource.findById(req.params.id);
-    if (!source) return res.status(404).json({ error: "Data source not found" });
-    if (source.user.toString() !== req.user.id) return res.status(403).json({ error: "Forbidden" });
-
-    res.json(source);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Server error" });
-  }
-});
-
-/* -------------------------------
-   CREATE a new data source
--------------------------------- */
-router.post("/", authMiddleware, async (req, res) => {
-  try {
-    const { type, name, config } = req.body;
-    const newSource = new DataSource({ user: req.user.id, type, name, config });
-    await newSource.save();
-    res.status(201).json({ message: "Data source created", source: newSource });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Server error" });
-  }
-});
-
-/* -------------------------------
-   UPDATE existing data source
--------------------------------- */
-router.put("/:id", authMiddleware, async (req, res) => {
-  try {
-    const source = await DataSource.findById(req.params.id);
-    if (!source) return res.status(404).json({ error: "Data source not found" });
-    if (source.user.toString() !== req.user.id) return res.status(403).json({ error: "Forbidden" });
-
-    Object.assign(source, req.body);
-    await source.save();
-    res.json({ message: "Data source updated", source });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Server error" });
-  }
-});
-
-/* -------------------------------
-   DELETE a data source
--------------------------------- */
-router.delete("/:id", authMiddleware, async (req, res) => {
-  try {
-    const source = await DataSource.findById(req.params.id);
-    if (!source) return res.status(404).json({ error: "Data source not found" });
-    if (source.user.toString() !== req.user.id) return res.status(403).json({ error: "Forbidden" });
-
-    await source.remove();
-    res.json({ message: "Data source deleted" });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Server error" });
-  }
-});
-
-/* -------------------------------
-   FILE UPLOAD — CSV / Excel
--------------------------------- */
-router.post("/upload", authMiddleware, upload.single("file"), async (req, res) => {
-  try {
-    const { type, name } = req.body;
-    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
-
-    const newSource = new DataSource({
-      user: req.user.id,
-      type,
-      name,
-      fileInfo: {
-        fileName: req.file.originalname,
-        filePath: req.file.path,
-        fileSize: req.file.size,
-        mimeType: req.file.mimetype,
-      },
-    });
-    await newSource.save();
-
-    // Parse file
-    let rows = [];
-    if (req.file.mimetype.includes("csv")) {
-      await new Promise((resolve, reject) => {
-        fs.createReadStream(req.file.path)
-          .pipe(csv())
-          .on("data", (row) => rows.push(row))
-          .on("end", resolve)
-          .on("error", reject);
-      });
-    } else if (req.file.originalname.endsWith(".xlsx")) {
-      const workbook = xlsx.readFile(req.file.path);
-      const sheet = workbook.Sheets[workbook.SheetNames[0]];
-      rows = xlsx.utils.sheet_to_json(sheet);
-    } else {
-      return res.status(400).json({ error: "Unsupported file type" });
+    const { search } = req.query;
+    
+    // Build search filter
+    let filter = { user: req.user._id };
+    if (search && search.trim() !== '') {
+      filter.name = { $regex: search, $options: 'i' };
     }
 
-    // Store in RawData
-    const formattedRows = rows.map((row) => ({
-      source: newSource._id,
-      user: req.user.id,
-      data: row,
-    }));
-    if (formattedRows.length > 0) await RawData.insertMany(formattedRows);
+    const sources = await DataSource.find(filter)
+      .sort({ createdAt: -1 })
+      .select('-fileInfo.filePath')
+      .lean();
 
-    // Update metadata
-    newSource.metadata = { headers: Object.keys(rows[0] || {}), rowCount: rows.length };
-    await newSource.save();
-
-    fs.unlinkSync(req.file.path);
-
-    res.json({
-      message: "File uploaded and stored successfully",
-      rowsSaved: rows.length,
-      source: newSource,
+    res.json({ 
+      sources,
+      count: sources.length 
     });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Server error" });
+  } catch (error) {
+    console.error('Error fetching data sources:', error);
+    res.status(500).json({ 
+      message: 'Error fetching data sources', 
+      error: error.message 
+    });
   }
 });
 
-/* -------------------------------
-   PLACEHOLDER — Google Analytics / AWS S3
--------------------------------- */
-router.post("/connect/google-analytics", authMiddleware, async (req, res) => {
-  res.json({ message: "Google Analytics integration not implemented yet" });
+// === CSV UPLOAD ===
+router.post('/upload/csv', authMiddleware, upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
+
+    const filePath = path.join(__dirname, '..', req.file.path);
+    const rows = [];
+
+    fs.createReadStream(filePath)
+      .pipe(csv())
+      .on('data', data => rows.push(data))
+      .on('end', async () => {
+        const dataSource = await DataSource.create({
+          user: req.user._id,
+          type: 'csv-upload',
+          name: req.body.name || req.file.originalname,
+          fileInfo: {
+            fileName: req.file.originalname,
+            filePath: filePath,
+            fileSize: req.file.size,
+            mimeType: req.file.mimetype
+          },
+          metadata: {
+            headers: rows.length > 0 ? Object.keys(rows[0]) : [],
+            rowCount: rows.length
+          }
+        });
+        
+        await saveRowsToRawData(rows, dataSource._id);
+        fs.unlinkSync(filePath);
+        
+        res.json({ 
+          message: 'CSV data uploaded successfully', 
+          dataSource,
+          rowsSaved: rows.length 
+        });
+      });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Error uploading CSV', error: error.message });
+  }
 });
 
-router.post("/connect/aws-s3", authMiddleware, async (req, res) => {
-  res.json({ message: "AWS S3 integration not implemented yet" });
+// === EXCEL UPLOAD ===
+router.post('/upload/excel', authMiddleware, upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
+
+    const filePath = path.join(__dirname, '..', req.file.path);
+    const workbook = XLSX.readFile(filePath);
+    const sheetName = workbook.SheetNames[0];
+    const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
+
+    const dataSource = await DataSource.create({
+      user: req.user._id,
+      type: 'excel-upload',
+      name: req.body.name || req.file.originalname,
+      fileInfo: {
+        fileName: req.file.originalname,
+        filePath: filePath,
+        fileSize: req.file.size,
+        mimeType: req.file.mimetype
+      },
+      metadata: {
+        headers: rows.length > 0 ? Object.keys(rows[0]) : [],
+        rowCount: rows.length
+      }
+    });
+
+    await saveRowsToRawData(rows, dataSource._id);
+    fs.unlinkSync(filePath);
+    
+    res.json({ 
+      message: 'Excel data uploaded successfully', 
+      dataSource,
+      rowsSaved: rows.length 
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Error uploading Excel', error: error.message });
+  }
+});
+
+// === GOOGLE ANALYTICS (SIMULATED) ===
+router.post('/google-analytics', authMiddleware, async (req, res) => {
+  try {
+    const { name, config } = req.body;
+    if (!name) return res.status(400).json({ message: 'Name required' });
+
+    // Simulated data
+    const analyticsData = [
+      { date: '2025-10-01', pageViews: 1240, users: 300 },
+      { date: '2025-10-02', pageViews: 980, users: 260 },
+      { date: '2025-10-03', pageViews: 1500, users: 400 },
+    ];
+
+    const dataSource = await DataSource.create({
+      user: req.user._id,
+      type: 'google-analytics',
+      name: name,
+      config: config,
+      metadata: {
+        headers: analyticsData.length > 0 ? Object.keys(analyticsData[0]) : [],
+        rowCount: analyticsData.length
+      }
+    });
+
+    await saveRowsToRawData(analyticsData, dataSource._id);
+
+    res.json({ 
+      message: 'Google Analytics data connected successfully', 
+      dataSource 
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Error connecting Google Analytics', error: error.message });
+  }
+});
+
+// === MANUAL DATA ENTRY ===
+router.post('/manual', authMiddleware, async (req, res) => {
+  try {
+    const { name, data } = req.body;
+    if (!name || !data) {
+      return res.status(400).json({ message: 'Name and data are required' });
+    }
+
+    let parsedData;
+    try {
+      parsedData = JSON.parse(data);
+    } catch (parseError) {
+      return res.status(400).json({ message: 'Invalid JSON data' });
+    }
+
+    if (!Array.isArray(parsedData)) {
+      return res.status(400).json({ message: 'Data must be an array of objects' });
+    }
+
+    const dataSource = await DataSource.create({
+      user: req.user._id,
+      type: 'manual',
+      name: name,
+      metadata: {
+        headers: parsedData.length > 0 ? Object.keys(parsedData[0]) : [],
+        rowCount: parsedData.length
+      }
+    });
+
+    await saveRowsToRawData(parsedData, dataSource._id);
+
+    res.json({ 
+      message: 'Manual dataset created successfully', 
+      dataSource 
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Error creating manual dataset', error: error.message });
+  }
 });
 
 module.exports = router;

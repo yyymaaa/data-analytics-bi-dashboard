@@ -22,6 +22,13 @@ export default function DataSourcePage() {
     const selectedFile = e.target.files[0];
     setFile(selectedFile);
     setFileName(selectedFile ? selectedFile.name : "");
+
+    // Detect file type automatically
+    if (selectedFile) {
+      const ext = selectedFile.name.split(".").pop().toLowerCase();
+      if (ext === "csv") setType("csv-upload");
+      else if (["xls", "xlsx"].includes(ext)) setType("excel-upload");
+    }
   };
 
   const handleNameChange = (e) => setName(e.target.value);
@@ -31,35 +38,69 @@ export default function DataSourcePage() {
       setLoading(true);
       setMessage("");
 
-      if (type === "csv-upload" && file) {
+      if (["csv-upload", "excel-upload"].includes(type) && file) {
         const formData = new FormData();
         formData.append("file", file);
         formData.append("type", type);
         formData.append("name", name || file.name);
 
-        const res = await axios.post(
-          "http://localhost:5000/api/datasource/upload",
-          formData,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
+        // Use the correct endpoint based on file type
+        const endpoint = type === "csv-upload" 
+          ? "http://localhost:5000/api/datasource/upload/csv"
+          : "http://localhost:5000/api/datasource/upload/excel";
 
-        setMessage(`File uploaded successfully. ${res.data.rowsSaved} rows processed.`);
-        setPreview(res.data.source);
+        const res = await axios.post(endpoint, formData, { 
+          headers: { 
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'multipart/form-data'
+          } 
+        });
+
+        setMessage(`Data uploaded successfully.`);
+        setPreview(res.data.dataSource);
+        nextStep();
+      } else if (type === "google-analytics") {
+        const res = await axios.post(
+          "http://localhost:5000/api/datasource/google-analytics",
+          { 
+            name: name,
+            config: config
+          },
+          { 
+            headers: { 
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            } 
+          }
+        );
+        setMessage("Google Analytics source linked successfully.");
+        setPreview(res.data.dataSource);
+        nextStep();
+      } else if (type === "manual") {
+        const res = await axios.post(
+          "http://localhost:5000/api/datasource/manual",
+          { name, data: config.data },
+          { 
+            headers: { 
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            } 
+          }
+        );
+        setMessage("Manual dataset created successfully.");
+        setPreview(res.data.dataSource);
         nextStep();
       } else {
-        const res = await axios.post(
-          "http://localhost:5000/api/datasource",
-          { type, name, config },
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-
-        setMessage("Data source created successfully");
-        setPreview(res.data.source);
-        nextStep();
+        setMessage("Please select a valid data source and upload.");
       }
     } catch (err) {
-      const errorMessage = err.response?.data?.error || err.response?.data?.message || err.message || "Failed to create data source";
+      const errorMessage =
+        err.response?.data?.message ||
+        err.response?.data?.error ||
+        err.message ||
+        "Failed to create data source";
       setMessage(`Error: ${errorMessage}`);
+      console.error('Upload error:', err);
     } finally {
       setLoading(false);
     }
@@ -71,7 +112,12 @@ export default function DataSourcePage() {
       <h2 style={styles.heading}>Step 1: Choose Data Source Type</h2>
       <p style={styles.text}>Select where your data is coming from.</p>
       <div style={styles.options}>
-        {["csv-upload", "google-analytics", "aws", "manual"].map((option) => (
+        {[
+          "csv-upload",
+          "excel-upload",
+          "google-analytics",
+          "manual",
+        ].map((option) => (
           <button
             key={option}
             style={{
@@ -82,23 +128,25 @@ export default function DataSourcePage() {
           >
             {option === "csv-upload"
               ? "Upload CSV File"
+              : option === "excel-upload"
+              ? "Upload Excel File"
               : option === "google-analytics"
               ? "Google Analytics"
-              : option === "aws"
-              ? "AWS Data"
               : "Manual Entry"}
           </button>
         ))}
       </div>
       {type && (
         <div style={styles.actions}>
-          <button style={styles.nextBtn} onClick={nextStep}>Next</button>
+          <button style={styles.nextBtn} onClick={nextStep}>
+            Next
+          </button>
         </div>
       )}
     </div>
   );
 
-  // Step 2 — Connect or upload
+  // Step 2 — Upload or Configure
   const Step2 = () => (
     <div style={styles.card}>
       <h2 style={styles.heading}>Step 2: Configure Data Source</h2>
@@ -112,13 +160,15 @@ export default function DataSourcePage() {
         onChange={handleNameChange}
       />
 
-      {type === "csv-upload" && (
+      {["csv-upload", "excel-upload"].includes(type) && (
         <>
-          <label style={styles.label}>Upload your CSV file:</label>
+          <label style={styles.label}>
+            Upload your {type === "csv-upload" ? "CSV" : "Excel"} file:
+          </label>
           <div style={styles.fileUpload}>
             <input
               type="file"
-              accept=".csv"
+              accept={type === "csv-upload" ? ".csv" : ".xls,.xlsx"}
               onChange={handleFileSelect}
               style={styles.fileInput}
             />
@@ -129,45 +179,42 @@ export default function DataSourcePage() {
 
       {type === "google-analytics" && (
         <>
-          <label style={styles.label}>Google Analytics API key:</label>
+          <label style={styles.label}>Google Analytics Account Name:</label>
           <input
             style={styles.input}
             type="text"
-            placeholder="Enter API key"
+            placeholder="Enter your GA account name"
+            value={config.accountName || ""}
+            onChange={(e) => setConfig({ ...config, accountName: e.target.value })}
+          />
+
+          <label style={styles.label}>Property ID:</label>
+          <input
+            style={styles.input}
+            type="text"
+            placeholder="Example: GA-123456789"
+            value={config.propertyId || ""}
+            onChange={(e) => setConfig({ ...config, propertyId: e.target.value })}
+          />
+
+          <label style={styles.label}>API Key (Optional):</label>
+          <input
+            style={styles.input}
+            type="text"
+            placeholder="Enter your API key if needed"
             value={config.apiKey || ""}
             onChange={(e) => setConfig({ ...config, apiKey: e.target.value })}
           />
         </>
       )}
 
-      {type === "aws" && (
-        <>
-          <label style={styles.label}>AWS Access Key:</label>
-          <input
-            style={styles.input}
-            type="text"
-            placeholder="AWS Access Key"
-            value={config.accessKey || ""}
-            onChange={(e) => setConfig({ ...config, accessKey: e.target.value })}
-          />
-          <label style={styles.label}>AWS Secret Key:</label>
-          <input
-            style={styles.input}
-            type="password"
-            placeholder="AWS Secret Key"
-            value={config.secretKey || ""}
-            onChange={(e) => setConfig({ ...config, secretKey: e.target.value })}
-          />
-        </>
-      )}
-
       {type === "manual" && (
         <>
-          <label style={styles.label}>Sample data (JSON format):</label>
+          <label style={styles.label}>Enter sample JSON data:</label>
           <textarea
             style={styles.textArea}
-            rows="5"
-            placeholder='Example: {"region": "East", "sales": 1000}'
+            rows="6"
+            placeholder='Example: [{"region":"East","sales":1200}]'
             value={config.data || ""}
             onChange={(e) => setConfig({ ...config, data: e.target.value })}
           />
@@ -175,20 +222,23 @@ export default function DataSourcePage() {
       )}
 
       <div style={styles.actions}>
-        <button style={styles.prevBtn} onClick={prevStep}>Back</button>
+        <button style={styles.prevBtn} onClick={prevStep}>
+          Back
+        </button>
         <button
           style={styles.nextBtn}
           onClick={handleCreateSource}
-          disabled={loading || !name || (type === "csv-upload" && !file)}
+          disabled={loading || !name || (["csv-upload", "excel-upload"].includes(type) && !file)}
         >
           {loading ? "Processing..." : "Next"}
         </button>
       </div>
+
       {message && <p style={styles.message}>{message}</p>}
     </div>
   );
 
-  // Step 3 — Review & Confirm
+  // Step 3 — Review
   const Step3 = () => {
     if (!preview) return <p>Loading preview...</p>;
 
@@ -210,13 +260,17 @@ export default function DataSourcePage() {
             <table style={styles.table}>
               <thead>
                 <tr>
-                  {headers.map((h) => <th key={h}>{h}</th>)}
+                  {headers.map((h) => (
+                    <th key={h} style={styles.th}>{h}</th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
                 {preview.sampleRows.map((row, idx) => (
                   <tr key={idx}>
-                    {headers.map((h) => <td key={h}>{row[h]}</td>)}
+                    {headers.map((h) => (
+                      <td key={h} style={styles.td}>{row[h]}</td>
+                    ))}
                   </tr>
                 ))}
               </tbody>
@@ -225,9 +279,17 @@ export default function DataSourcePage() {
         </div>
 
         <div style={styles.actions}>
-          <button style={styles.prevBtn} onClick={prevStep}>Back</button>
-          <button style={styles.nextBtn} onClick={() => alert("Data source confirmed!")}>Confirm</button>
+          <button style={styles.prevBtn} onClick={prevStep}>
+            Back
+          </button>
+          <button
+            style={styles.nextBtn}
+            onClick={() => alert("✅ Data source confirmed!")}
+          >
+            Confirm
+          </button>
         </div>
+
         {message && <p style={styles.message}>{message}</p>}
       </div>
     );
@@ -242,69 +304,47 @@ export default function DataSourcePage() {
   );
 }
 
-
+// === STYLES ===
 const styles = {
   container: {
     padding: "40px",
     color: "#00ff80",
-    fontFamily: "'Fira Code', monospace, 'Courier New'",
+    fontFamily: "'Fira Code', monospace",
     width: "100%",
     minHeight: "calc(100vh - 80px)",
     backgroundColor: "#0e0e12",
-    boxSizing: "border-box",
   },
   card: {
     backgroundColor: "#18181d",
     padding: "40px",
-    borderRadius: "10px",
-    boxShadow: "0 0 15px rgba(0,255,128,0.3)",
-    maxWidth: "600px",
+    borderRadius: "12px",
+    boxShadow: "0 0 15px rgba(0,255,128,0.25)",
+    maxWidth: "640px",
     margin: "0 auto",
     border: "1px solid #00ff80",
   },
   heading: {
-    fontSize: "1.5rem",
-    marginBottom: "15px",
-    textShadow: "0 0 10px #00ff80",
-    color: "#00ff80",
-    textAlign: "center",
-  },
-  text: { 
-    color: "#b8fccc", 
+    fontSize: "1.6rem",
     marginBottom: "20px",
     textAlign: "center",
-    fontSize: "1rem",
   },
-  options: { 
-    display: "flex", 
-    flexDirection: "column", 
-    gap: "12px",
-    marginBottom: "20px",
-  },
+  text: { color: "#b8fccc", marginBottom: "20px", textAlign: "center" },
+  options: { display: "flex", flexDirection: "column", gap: "12px" },
   optionBtn: {
     padding: "15px",
     border: "2px solid #00ff80",
     borderRadius: "8px",
     cursor: "pointer",
-    fontSize: "1rem",
     backgroundColor: "#18181d",
     color: "#00ff80",
-    transition: "all 0.3s ease",
-    fontFamily: "'Fira Code', monospace, 'Courier New'",
+    transition: "0.3s",
   },
   optionBtnSelected: {
     backgroundColor: "#00ff80",
     color: "#0e0e12",
     fontWeight: "bold",
   },
-  label: { 
-    display: "block", 
-    marginTop: "20px", 
-    marginBottom: "8px",
-    color: "#00ff80",
-    fontSize: "1rem",
-    fontWeight: "bold",
-  },
+  label: { display: "block", marginTop: "20px", color: "#00ff80" },
   input: {
     width: "100%",
     padding: "12px",
@@ -312,101 +352,47 @@ const styles = {
     border: "2px solid #00ff80",
     backgroundColor: "#0e0e12",
     color: "#00ff80",
-    fontSize: "1rem",
-    boxSizing: "border-box",
-    fontFamily: "'Fira Code', monospace, 'Courier New'",
-  },
-  fileUpload: {
-    margin: "10px 0",
-  },
-  fileInput: {
-    width: "100%",
-    padding: "12px",
-    backgroundColor: "#0e0e12",
-    border: "2px solid #00ff80",
-    borderRadius: "6px",
-    color: "#00ff80",
-    boxSizing: "border-box",
-    fontFamily: "'Fira Code', monospace, 'Courier New'",
-  },
-  fileName: {
-    color: "#b8fccc",
-    fontSize: "0.9rem",
-    margin: "8px 0",
-    fontStyle: "italic",
   },
   textArea: {
     width: "100%",
-    backgroundColor: "#0e0e12",
-    border: "2px solid #00ff80",
-    color: "#00ff80",
-    borderRadius: "6px",
     padding: "12px",
-    fontSize: "1rem",
-    boxSizing: "border-box",
-    fontFamily: "'Fira Code', monospace, 'Courier New'",
-    resize: "vertical",
+    border: "2px solid #00ff80",
+    borderRadius: "6px",
+    backgroundColor: "#0e0e12",
+    color: "#00ff80",
   },
-  actions: { 
-    marginTop: "30px", 
-    display: "flex", 
+  actions: {
+    marginTop: "30px",
+    display: "flex",
     justifyContent: "space-between",
-    gap: "15px",
   },
   nextBtn: {
     backgroundColor: "#00ff80",
     color: "#0e0e12",
-    border: "none",
-    padding: "12px 30px",
+    padding: "12px 24px",
     borderRadius: "6px",
+    border: "none",
     cursor: "pointer",
-    fontSize: "1rem",
-    fontWeight: "bold",
-    fontFamily: "'Fira Code', monospace, 'Courier New'",
-    transition: "all 0.3s ease",
-    flex: 1,
   },
   prevBtn: {
     backgroundColor: "transparent",
     color: "#00ff80",
     border: "2px solid #00ff80",
-    padding: "12px 30px",
+    padding: "12px 24px",
     borderRadius: "6px",
     cursor: "pointer",
-    fontSize: "1rem",
-    fontWeight: "bold",
-    fontFamily: "'Fira Code', monospace, 'Courier New'",
-    transition: "all 0.3s ease",
-    flex: 1,
   },
   previewBox: {
     backgroundColor: "#0e0e12",
-    border: "2px solid #00ff80",
+    border: "1px solid #00ff80",
     borderRadius: "8px",
     padding: "20px",
     overflowX: "auto",
-    margin: "20px 0",
-  },
-  pre: {
-    color: "#00ff80",
-    fontSize: "0.9rem",
-    margin: 0,
-    fontFamily: "'Fira Code', monospace, 'Courier New'",
-  },
-  message: {
-    marginTop: "15px",
-    color: "#00ff80",
-    textAlign: "center",
-    fontSize: "1rem",
-    padding: "10px",
-    borderRadius: "6px",
-    backgroundColor: "rgba(0, 255, 128, 0.1)",
   },
   table: {
     width: "100%",
     borderCollapse: "collapse",
     marginTop: "15px",
-    marginBottom: "15px",
   },
   th: {
     border: "1px solid #00ff80",
@@ -416,5 +402,10 @@ const styles = {
   td: {
     border: "1px solid #00ff80",
     padding: "6px",
+  },
+  message: {
+    marginTop: "20px",
+    color: "#00ff80",
+    textAlign: "center",
   },
 };

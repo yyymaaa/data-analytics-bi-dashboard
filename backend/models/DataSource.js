@@ -1,7 +1,7 @@
 // backend/models/DataSource.js
 //this model keeps track of each connected or uploaded data source
 
-
+// backend/models/DataSource.js
 const mongoose = require('mongoose');
 
 const dataSourceSchema = new mongoose.Schema({
@@ -10,7 +10,7 @@ const dataSourceSchema = new mongoose.Schema({
   // Source type — expanded
   type: {
     type: String,
-    enum: ['google-analytics', 'aws-s3', 'csv-upload', 'excel-upload', 'manual'],
+    enum: ['google-analytics', 'csv-upload', 'excel-upload', 'manual'], // Add 'manual'
     required: true
   },
 
